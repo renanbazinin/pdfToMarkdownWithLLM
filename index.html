@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lecture Notes Viewer</title>
+
+  <!-- Marked.js for Markdown parsing -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <!-- KaTeX for fast LaTeX rendering -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+Hebrew:wght@300;400;500;600;700&display=swap');
+
+    :root {
+      --bg-primary: #0f0f1a;
+      --bg-secondary: #1a1a2e;
+      --bg-card: #16213e;
+      --bg-sidebar: #0d1117;
+      --accent: #6c63ff;
+      --accent-glow: rgba(108, 99, 255, 0.3);
+      --text-primary: #e8e8f0;
+      --text-secondary: #a0a0b8;
+      --text-muted: #6b6b80;
+      --border: #2a2a40;
+      --success: #4ade80;
+      --hover: #252545;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Noto Sans Hebrew', 'Inter', sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      display: flex;
+    }
+
+    /* --- Sidebar --- */
+    .sidebar {
+      width: 280px;
+      min-width: 280px;
+      background: var(--bg-sidebar);
+      border-left: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      position: sticky;
+      top: 0;
+      overflow: hidden;
+    }
+
+    .sidebar-header {
+      padding: 24px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .sidebar-header h1 {
+      font-size: 1.1rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--accent), #a78bfa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 4px;
+    }
+
+    .sidebar-header p {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    /* Upload area */
+    .upload-area {
+      padding: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .upload-buttons {
+      display: flex;
+      gap: 10px;
+    }
+
+    .upload-btn {
+      flex: 1;
+      padding: 10px;
+      border-radius: 8px;
+      border: 2px dashed var(--border);
+      background: transparent;
+      color: var(--text-secondary);
+      font-family: inherit;
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .upload-btn:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: rgba(108, 99, 255, 0.05);
+    }
+
+    .file-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 10px;
+    }
+
+    .file-list::-webkit-scrollbar { width: 4px; }
+    .file-list::-webkit-scrollbar-track { background: transparent; }
+    .file-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+    .file-item {
+      padding: 10px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 2px;
+    }
+
+    .file-item:hover {
+      background: var(--hover);
+      color: var(--text-primary);
+    }
+
+    .file-item.active {
+      background: rgba(108, 99, 255, 0.15);
+      color: var(--accent);
+      font-weight: 600;
+      box-shadow: inset 3px 0 0 var(--accent);
+    }
+
+    .file-item .icon { font-size: 1rem; opacity: 0.7; flex-shrink: 0; }
+    .file-item.active .icon { opacity: 1; }
+
+    /* --- Main Content --- */
+    .main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    .topbar {
+      padding: 16px 32px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(15, 15, 26, 0.8);
+      backdrop-filter: blur(12px);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .topbar h2 { font-size: 1rem; font-weight: 600; }
+
+    .topbar .badge {
+      font-size: 0.7rem;
+      padding: 3px 10px;
+      border-radius: 20px;
+      background: rgba(108, 99, 255, 0.15);
+      color: var(--accent);
+      font-weight: 500;
+    }
+
+    .content-area {
+      flex: 1;
+      overflow-y: auto;
+      padding: 40px;
+    }
+
+    .content-area::-webkit-scrollbar { width: 6px; }
+    .content-area::-webkit-scrollbar-track { background: transparent; }
+    .content-area::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+    /* --- Markdown Styles --- */
+    .markdown-body {
+      max-width: 860px;
+      margin: 0 auto;
+      line-height: 1.85;
+      font-size: 0.95rem;
+    }
+
+    .markdown-body h1, .markdown-body h2, .markdown-body h3, .markdown-body h4 {
+      color: var(--text-primary);
+      margin: 1.8em 0 0.6em;
+      font-weight: 700;
+      line-height: 1.3;
+    }
+
+    .markdown-body h1 { font-size: 1.7rem; border-bottom: 2px solid var(--border); padding-bottom: 10px; }
+    .markdown-body h2 { font-size: 1.4rem; }
+    .markdown-body h3 { font-size: 1.15rem; color: var(--accent); }
+    .markdown-body h4 { font-size: 1rem; }
+
+    .markdown-body p { margin: 0.7em 0; color: var(--text-secondary); }
+    .markdown-body strong { color: var(--text-primary); font-weight: 600; }
+    .markdown-body em { color: var(--text-secondary); font-style: italic; }
+
+    .markdown-body ul, .markdown-body ol { padding-right: 24px; margin: 0.6em 0; }
+    .markdown-body li { margin: 0.3em 0; color: var(--text-secondary); }
+
+    .markdown-body hr {
+      border: none;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--border), transparent);
+      margin: 2em 0;
+    }
+
+    .markdown-body code {
+      background: rgba(108, 99, 255, 0.1);
+      color: #c4b5fd;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.85em;
+      font-family: 'Courier New', monospace;
+    }
+
+    .markdown-body pre {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      overflow-x: auto;
+      margin: 1em 0;
+    }
+
+    .markdown-body pre code { background: none; padding: 0; color: var(--text-secondary); }
+
+    .markdown-body blockquote {
+      border-right: 3px solid var(--accent);
+      padding: 8px 16px;
+      margin: 1em 0;
+      background: rgba(108, 99, 255, 0.05);
+      border-radius: 0 8px 8px 0;
+      color: var(--text-secondary);
+    }
+
+    /* KaTeX overrides */
+    .katex { font-size: 1.05em; color: var(--text-primary); direction: ltr; unicode-bidi: isolate; }
+    .katex-display { direction: ltr; text-align: center; margin: 1.2em 0; unicode-bidi: isolate; }
+
+    /* --- Empty State --- */
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 60vh;
+      color: var(--text-muted);
+      text-align: center;
+    }
+
+    .empty-state .emoji { font-size: 3rem; margin-bottom: 16px; }
+    .empty-state h3 { font-size: 1.1rem; margin-bottom: 6px; color: var(--text-secondary); }
+    .empty-state p { font-size: 0.85rem; }
+
+    @media (max-width: 768px) {
+      .sidebar { width: 220px; min-width: 220px; }
+      .content-area { padding: 24px 16px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <h1>📚 Lecture Notes</h1>
+      <p>PDF → Markdown Viewer</p>
+    </div>
+    <div class="upload-area">
+      <div class="upload-buttons">
+        <button class="upload-btn" onclick="document.getElementById('fileInput').click()" title="בחר קבצים בודדים">
+          📄 קובץ
+        </button>
+        <button class="upload-btn" onclick="document.getElementById('folderInput').click()" title="בחר תיקייה שלמה">
+          📂 תיקייה
+        </button>
+      </div>
+      <input type="file" id="fileInput" accept=".md" multiple hidden />
+      <input type="file" id="folderInput" webkitdirectory directory hidden />
+    </div>
+    <div class="file-list" id="fileList"></div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+    <div class="topbar" id="topbar">
+      <h2 id="currentTitle">בחר קובץ מהתפריט</h2>
+      <span class="badge" id="badge" style="display:none;">Markdown</span>
+    </div>
+    <div class="content-area" id="contentArea">
+      <div class="empty-state">
+        <div class="emoji">📄</div>
+        <h3>העלה קבצי Markdown</h3>
+        <p>לחץ על סמל התיקייה או הקובץ כדי לטעון הרצאות</p>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    // Store loaded files: { name, content }
+    const loadedFiles = [];
+
+    const fileInput = document.getElementById('fileInput');
+    const folderInput = document.getElementById('folderInput');
+
+    function handleFiles(event) {
+      const files = Array.from(event.target.files).filter(f => f.name.endsWith('.md'));
+      if (files.length === 0) return;
+
+      // Read all selected files
+      files.forEach(file => {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          // Avoid duplicates
+          const existing = loadedFiles.findIndex(f => f.name === file.name);
+          if (existing !== -1) {
+            loadedFiles[existing].content = ev.target.result;
+          } else {
+            loadedFiles.push({ name: file.name, content: ev.target.result });
+          }
+
+          // Sort numerically
+          loadedFiles.sort((a, b) => {
+            const numA = parseInt(a.name) || 0;
+            const numB = parseInt(b.name) || 0;
+            if (numA !== numB) return numA - numB;
+            return a.name.localeCompare(b.name, undefined, { numeric: true });
+          });
+
+          renderSidebar();
+
+          // Auto-select first file if none selected
+          if (!document.querySelector('.file-item.active') && loadedFiles.length > 0) {
+            showFile(loadedFiles[0].name);
+          }
+        };
+        reader.readAsText(file);
+      });
+    }
+
+    fileInput.addEventListener('change', handleFiles);
+    folderInput.addEventListener('change', handleFiles);
+
+    function renderSidebar() {
+      const list = document.getElementById('fileList');
+      const activeName = document.querySelector('.file-item.active')?.dataset.file;
+
+      list.innerHTML = loadedFiles.map(f => {
+        const displayName = f.name.replace('.md', '');
+        const num = parseInt(displayName);
+        const label = !isNaN(num) ? `הרצאה ${num}` : displayName;
+        const isActive = f.name === activeName ? ' active' : '';
+        return `<div class="file-item${isActive}" data-file="${f.name}" onclick="showFile('${f.name}')">
+          <span class="icon">📝</span>
+          <span>${label}</span>
+        </div>`;
+      }).join('');
+    }
+
+    function showFile(filename) {
+      const file = loadedFiles.find(f => f.name === filename);
+      if (!file) return;
+
+      // Update sidebar active state
+      document.querySelectorAll('.file-item').forEach(el => el.classList.remove('active'));
+      const activeEl = document.querySelector(`.file-item[data-file="${filename}"]`);
+      if (activeEl) activeEl.classList.add('active');
+
+      // Update title
+      const displayName = filename.replace('.md', '');
+      const num = parseInt(displayName);
+      document.getElementById('currentTitle').textContent = !isNaN(num) ? `הרצאה ${num}` : displayName;
+      document.getElementById('badge').style.display = 'inline';
+
+      // Strip outer <div dir="rtl"> wrapper if present
+      let md = file.content;
+      md = md.replace(/^\s*<div dir="rtl">\s*/i, '').replace(/\s*<\/div>\s*$/i, '');
+
+      // --- PROTECT MATH FROM MARKED.JS ---
+      // marked.js often breaks LaTeX by parsing _ or * as italics inside formulas.
+      // We extract all math blocks, replace them with temporary placeholders, 
+      // let marked parse the markdown, and then inject the math strings back.
+      const mathBlocks = [];
+      let counter = 0;
+      
+      // Extract block equations ($$...$$)
+      md = md.replace(/\$\$([\s\S]+?)\$\$/g, (match) => {
+        const id = `@@@MATH_BLOCK_${counter++}@@@`;
+        mathBlocks.push({ id, text: match });
+        return id;
+      });
+      
+      // Extract inline equations ($...$)
+      md = md.replace(/\$((?:\\.|[^$\n])+?)\$/g, (match) => {
+        const id = `@@@MATH_INLINE_${counter++}@@@`;
+        mathBlocks.push({ id, text: match });
+        return id;
+      });
+
+      // Parse markdown to HTML
+      let html = marked.parse(md);
+
+      // Restore math formulas
+      mathBlocks.forEach(b => {
+        html = html.replace(b.id, b.text);
+      });
+      // -----------------------------------
+
+      const content = document.getElementById('contentArea');
+      content.innerHTML = `<div class="markdown-body" dir="rtl">${html}</div>`;
+
+      // Render LaTeX
+      renderMathInElement(content, {
+        delimiters: [
+          { left: '$$', right: '$$', display: true },
+          { left: '$', right: '$', display: false },
+        ],
+        throwOnError: false,
+      });
+
+      // Scroll to top
+      content.scrollTop = 0;
+    }
+  </script>
+</body>
+</html>
