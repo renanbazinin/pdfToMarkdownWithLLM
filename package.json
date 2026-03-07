@@ -1,0 +1,13 @@
+{
+  "name": "pdf-to-markdown",
+  "version": "1.0.0",
+  "description": "Convert PDF lesson notes to Markdown with LaTeX math using the Gemini API",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.21.0",
+    "dotenv": "^16.4.5"
+  }
+}
