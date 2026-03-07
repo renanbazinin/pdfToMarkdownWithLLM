@@ -1,5 +1,4 @@
 node_modules/
 .env
-output/
 lessons/
 .DS_Store

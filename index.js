@@ -13,7 +13,10 @@ if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === 'your_actual_a
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 // Exact model requested
-const MODEL_NAME = 'gemini-3.1-pro-preview'; 
+const MODEL_NAME = 'gemini-3.1-pro-preview';
+
+// If true, skip PDFs that already have a corresponding .md file in the output folder
+const SKIP_EXISTING_FILES = true;
 
 // Delay helper to avoid rate limits
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -46,10 +49,24 @@ async function main() {
 
   console.log(`Found ${files.length} PDF file(s). Starting conversion...`);
 
-  // Initialize the model with the strongly-worded system prompt
+  const systemInstruction = `You are an expert transcriber, technical editor, and LaTeX formatting specialist. Your task is to convert the PDF content into clean, well-structured Markdown that is highly compatible with LaTeX.
+
+Key Instructions:
+1. Structure & Corrections: Intelligently fix any context mistakes, OCR errors, or grammatical issues in the source text. Reorder and reformat the content to improve the logical flow and make it perfectly suited for Markdown and LaTeX.
+2. Math Formatting (STRICT): Wrap all inline math and complexity theory symbols in single $, and wrap all block/display equations in $$.
+   - CRITICAL: NEVER use Markdown formatting (like _, *, or **) inside math formulas! Underscores and asterisks inside $...$ must only be used for LaTeX subscripts and math operators, not for styling.
+   - CRITICAL: NEVER mix Hebrew words inside a math formula. Math should contain only Latin/Greek letters and math symbols. If a formula needs a Hebrew word, close the formula, write the Hebrew word, and open a new formula.
+   - Always ensure block equations ($$...$$) have a blank line before and after them.
+3. Language Context: The text is primarily in Hebrew with English mathematical formulas.
+4. RTL Formatting: Wrap the entire output in \`<div dir="rtl">\` and \`</div>\`. Do NOT add any directional HTML tags (like <span dir="ltr">) on individual formulas. The overall RTL div handles direction naturally.`;
+
+  // Initialize the model with the enhanced system prompt
   const model = genAI.getGenerativeModel({
     model: MODEL_NAME,
-    systemInstruction: "You are an expert transcriber. You must convert the PDF content into clean Markdown, wrap all inline math and complexity theory symbols in $, and wrap all block equations in $$. You must not summarize or hallucinate text; transcribe everything exactly as written. The text is primarily in Hebrew with English mathematical formulas. Ensure the generated Markdown output is formatted correctly for Right-to-Left (RTL) reading by wrapping the entire output in HTML `<div dir=\"rtl\">...</div>`. CRITICAL INSTRUCTION For Math and English inside RTL: When writing inline math formulas like $S_f$ or $O(n)$, or any English variables/text inside the Hebrew sentences, you MUST wrap the equation or English word itself with a `<span dir=\"ltr\">` tag to ensure it renders left-to-right correctly and the subscript/superscript letters do not jump sides. For example, write `<span dir=\"ltr\">$S_f$</span>` instead of just `$S_f$`. Do this for ALL inline equations and standalone English variables."
+    systemInstruction: systemInstruction,
+    generationConfig: {
+      temperature: 0.2, // Low temperature for accuracy, but allows some freedom for fixing mistakes and reordering
+    }
   });
 
   for (let i = 0; i < files.length; i++) {
@@ -58,7 +75,12 @@ async function main() {
     const baseName = path.parse(file).name;
     const outputPath = path.join(outputDir, `${baseName}.md`);
 
-    console.log(`[${i + 1}/${files.length}] Processing: ${file} ...`);
+    console.log(`\n[${i + 1}/${files.length}] Processing: ${file} ...`);
+
+    if (SKIP_EXISTING_FILES && fs.existsSync(outputPath)) {
+      console.log(` ⏩ Skipping ${file} (output/${baseName}.md already exists)`);
+      continue;
+    }
 
     try {
       // Read the PDF file directly into base64 format for the API Request
@@ -72,10 +94,10 @@ async function main() {
 
       // Call the Gemini model
       const result = await model.generateContent([
-        "Please transcribe this PDF document perfectly according to your system instructions.", 
+        "Please transcribe, correct, and optimally format this PDF document according to your system instructions. Ensure perfect Markdown/LaTeX structure.",
         pdfPart
       ]);
-      
+
       const text = result.response.text();
 
       // Save the generated Markdown to the output directory
@@ -90,7 +112,7 @@ async function main() {
     // (Skips the delay after the very last file is processed)
     if (i < files.length - 1) {
       console.log(`Waiting 5 seconds before the next API call to respect rate limits...\n`);
-      await delay(5000); 
+      await delay(5000);
     }
   }
 
