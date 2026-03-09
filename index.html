@@ -292,6 +292,9 @@
         <button class="upload-btn" onclick="document.getElementById('folderInput').click()" title="בחר תיקייה שלמה">
           📂 תיקייה
         </button>
+        <button class="upload-btn" onclick="openFreeText()" title="הדבק טקסט חופשי">
+          ✏️ הדבק
+        </button>
       </div>
       <input type="file" id="fileInput" accept=".md" multiple hidden />
       <input type="file" id="folderInput" webkitdirectory directory hidden />
@@ -437,6 +440,91 @@
       });
 
       // Scroll to top
+      content.scrollTop = 0;
+    }
+
+    function openFreeText() {
+      // Clear sidebar active state
+      document.querySelectorAll('.file-item').forEach(el => el.classList.remove('active'));
+      
+      document.getElementById('currentTitle').textContent = 'טקסט חופשי';
+      document.getElementById('badge').style.display = 'none';
+
+      const content = document.getElementById('contentArea');
+      content.innerHTML = `
+        <div style="display: flex; flex-direction: column; gap: 16px; height: 100%;">
+          <textarea id="freeTextInput" placeholder="הדבק כאן Markdown או LaTeX..." style="
+            flex: 1;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+            font-family: monospace;
+            font-size: 1rem;
+            resize: none;
+            direction: ltr; /* usually better for editing raw markdown */
+          "></textarea>
+          <button onclick="renderFreeText()" style="
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            width: fit-content;
+            align-self: flex-start;
+          ">רנדר טקסט</button>
+        </div>
+      `;
+    }
+
+    function renderFreeText() {
+      const inputEl = document.getElementById('freeTextInput');
+      if (!inputEl) return;
+      
+      let md = inputEl.value;
+      if (!md.trim()) return;
+
+      document.getElementById('badge').style.display = 'inline';
+
+      // Re-use same pipeline
+      md = md.replace(/^\s*<div dir="rtl">\s*/i, '').replace(/\s*<\/div>\s*$/i, '');
+
+      const mathBlocks = [];
+      let counter = 0;
+      
+      md = md.replace(/\$\$([\s\S]+?)\$\$/g, (match) => {
+        const id = `@@@MATH_BLOCK_${counter++}@@@`;
+        mathBlocks.push({ id, text: match });
+        return id;
+      });
+      
+      md = md.replace(/\$((?:\\.|[^$\n])+?)\$/g, (match) => {
+        const id = `@@@MATH_INLINE_${counter++}@@@`;
+        mathBlocks.push({ id, text: match });
+        return id;
+      });
+
+      let html = marked.parse(md);
+
+      mathBlocks.forEach(b => {
+        html = html.replace(b.id, b.text);
+      });
+
+      const content = document.getElementById('contentArea');
+      content.innerHTML = `<div class="markdown-body" dir="rtl">${html}</div>`;
+
+      renderMathInElement(content, {
+        delimiters: [
+          { left: '$$', right: '$$', display: true },
+          { left: '$', right: '$', display: false },
+        ],
+        throwOnError: false,
+      });
+
       content.scrollTop = 0;
     }
   </script>
